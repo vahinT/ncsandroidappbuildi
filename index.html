@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NCS Chat</title>
+    <style>
+        body { margin: 0; padding: 10px; font-family: Arial; }
+        #chatLog { 
+            height: 70vh; 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            margin-bottom: 10px;
+            overflow-y: auto;
+        }
+        #typingStatus { color: #666; margin-bottom: 5px; }
+        #messageInput { width: 75%; padding: 8px; }
+        #sendBtn { width: 20%; padding: 8px; }
+    </style>
+</head>
+<body>
+    <div id="chatLog"></div>
+    <div id="typingStatus"></div>
+    <input type="text" id="messageInput" placeholder="Type your message...">
+    <button id="sendBtn">Send</button>
+
+    <script>
+        // GitHub configuration with base64-encoded token
+        const REPO_OWNER = "ncs-x1";
+        const REPO_NAME = "NCS-1SS";
+        const CHAT_FILE = "chat1.txt";
+        const TYPING_FILE = "typing.txt";
+        const ENCODED_TOKEN = "Z2l0aHViX3BhdF8xMUJSUVRCQkkwNTF0OHRwdVAwSDJsX211NzNMR213UVhhSEZoV1Q5OEFVdnFOUXlHWlRKNjVESmdjajh6SXpMeUVUUFNQSEFGbldCNFdvSlM=";
+        
+        let currentUser = "vahin";
+        let chatSha = null;
+        let typingTimer;
+
+        // Get actual token from base64
+        const getToken = () => atob(ENCODED_TOKEN);
+
+        // GitHub API helper
+        async function githubRequest(url, method = 'GET', body = null) {
+            const headers = {
+                'Authorization': `token ${getToken()}`,
+                'Accept': 'application/vnd.github+json'
+            };
+            
+            const response = await fetch(url, {
+                method,
+                headers,
+                body: body ? JSON.stringify(body) : null
+            });
+            
+            return response.json();
+        }
+
+        // Rest of the code remains the same as previous HTML version
+        async function getFileContent(filePath) {
+            try {
+                const data = await githubRequest(
+                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filePath}`
+                );
+                return {
+                    content: atob(data.content),
+                    sha: data.sha
+                };
+            } catch (error) {
+                return { content: '', sha: null };
+            }
+        }
+
+        // ... (rest of the JavaScript code from previous answer remains identical) ...
+        
+        // Initialization
+        document.getElementById('sendBtn').addEventListener('click', sendMessage);
+        document.getElementById('messageInput').addEventListener('input', handleTyping);
+        refreshChat();
+    </script>
+</body>
+</html>
