@@ -10,10 +10,25 @@
             padding: 10px; 
             margin-bottom: 10px;
             overflow-y: auto;
+            white-space: pre-wrap;
         }
-        #typingStatus { color: #666; margin-bottom: 5px; }
-        #messageInput { width: 75%; padding: 8px; }
-        #sendBtn { width: 20%; padding: 8px; }
+        #typingStatus { 
+            color: #666; 
+            margin-bottom: 5px; 
+            min-height: 20px;
+        }
+        #messageInput { 
+            width: 75%; 
+            padding: 8px; 
+            margin-right: 1%;
+        }
+        #sendBtn { 
+            width: 23%; 
+            padding: 8px; 
+            background: #007bff; 
+            color: white; 
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -23,44 +38,44 @@
     <button id="sendBtn">Send</button>
 
     <script>
-        // GitHub configuration with base64-encoded token
         const REPO_OWNER = "ncs-x1";
         const REPO_NAME = "NCS-1SS";
         const CHAT_FILE = "chat1.txt";
         const TYPING_FILE = "typing.txt";
         const ENCODED_TOKEN = "Z2l0aHViX3BhdF8xMUJSUVRCQkkwNTF0OHRwdVAwSDJsX211NzNMR213UVhhSEZoV1Q5OEFVdnFOUXlHWlRKNjVESmdjajh6SXpMeUVUUFNQSEFGbldCNFdvSlM=";
         
-        let currentUser = "vahin";
+        let currentUser = `user_${Math.floor(Math.random() * 1000)}`;
         let chatSha = null;
-        let typingTimer;
+        let typingSha = null;
+        let typingTimeout;
 
-        // Get actual token from base64
         const getToken = () => atob(ENCODED_TOKEN);
 
-        // GitHub API helper
         async function githubRequest(url, method = 'GET', body = null) {
-            const headers = {
-                'Authorization': `token ${getToken()}`,
-                'Accept': 'application/vnd.github+json'
-            };
-            
-            const response = await fetch(url, {
-                method,
-                headers,
-                body: body ? JSON.stringify(body) : null
-            });
-            
-            return response.json();
+            try {
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Authorization': `token ${getToken()}`,
+                        'Accept': 'application/vnd.github+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: body ? JSON.stringify(body) : null
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                return null;
+            }
         }
 
-        // Rest of the code remains the same as previous HTML version
         async function getFileContent(filePath) {
             try {
                 const data = await githubRequest(
                     `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filePath}`
                 );
                 return {
-                    content: atob(data.content),
+                    content: data.content ? atob(data.content) : '',
                     sha: data.sha
                 };
             } catch (error) {
@@ -68,11 +83,83 @@
             }
         }
 
-        // ... (rest of the JavaScript code from previous answer remains identical) ...
-        
-        // Initialization
+        async function updateFile(filePath, content, sha) {
+            return githubRequest(
+                `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filePath}`,
+                'PUT',
+                {
+                    message: `Update ${filePath}`,
+                    content: btoa(content),
+                    sha
+                }
+            );
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = `${currentUser}: ${input.value}\n`;
+            
+            try {
+                const chat = await getFileContent(CHAT_FILE);
+                await updateFile(CHAT_FILE, chat.content + message, chat.sha);
+                input.value = '';
+                updateTypingStatus(false);
+            } catch (error) {
+                console.error('Send Error:', error);
+            }
+        }
+
+        async function updateTypingStatus(isTyping) {
+            try {
+                const typing = await getFileContent(TYPING_FILE);
+                let status = new Set(typing.content.split('\n').filter(Boolean));
+                
+                if (isTyping) status.add(currentUser);
+                else status.delete(currentUser);
+
+                await updateFile(TYPING_FILE, [...status].join('\n'), typing.sha);
+            } catch (error) {
+                console.error('Typing Update Error:', error);
+            }
+        }
+
+        function handleTyping() {
+            clearTimeout(typingTimeout);
+            updateTypingStatus(true);
+            typingTimeout = setTimeout(() => updateTypingStatus(false), 1000);
+        }
+
+        async function refreshChat() {
+            try {
+                const chat = await getFileContent(CHAT_FILE);
+                const typing = await getFileContent(TYPING_FILE);
+                
+                // Update chat log
+                if (chat.content !== document.getElementById('chatLog').textContent) {
+                    document.getElementById('chatLog').textContent = chat.content;
+                    document.getElementById('chatLog').scrollTop = document.getElementById('chatLog').scrollHeight;
+                }
+                
+                // Update typing status
+                const typers = typing.content.split('\n').filter(Boolean);
+                document.getElementById('typingStatus').textContent = typers.length 
+                    ? `${typers.join(', ')} ${typers.length > 1 ? 'are' : 'is'} typing...`
+                    : '';
+            } catch (error) {
+                console.error('Refresh Error:', error);
+            }
+            
+            setTimeout(refreshChat, 1000); // 1 second refresh
+        }
+
+        // Event Listeners
         document.getElementById('sendBtn').addEventListener('click', sendMessage);
         document.getElementById('messageInput').addEventListener('input', handleTyping);
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Initialize
         refreshChat();
     </script>
 </body>
